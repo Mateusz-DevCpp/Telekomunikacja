@@ -1,0 +1,6 @@
+# depslib dependency file v1.0
+1616254626 source:c:\users\mateusz\desktop\tele_zad1\main.cpp
+	<iostream>
+	<fstream>
+	<bitset>
+
