@@ -133,7 +133,7 @@ char odkodowanie(int *T)
 
          if(i == 7)
          {
-
+            return BitsToChar(T);
          }
     }
 
