@@ -1,267 +1,150 @@
-#include "const.h"
+#include <fstream>
+#include <string.h>
+#include <windows.h>
+#include <iostream>
+
+#include "../code.h"
+#include "../port.h"
+#include "../funkcje.h"
+
 using namespace std;
-
-ofstream plik;
-
-char blokDanych[128];
-char znak;
-unsigned long rozmiarZnaku= sizeof(znak);
-int licznikZnakow=1;
-bool transmisja=false;
-bool poprawnyPakiet;
-int nrBloku;
-char dopelnienieDo255;
-char sumaKontrolnaCRC[2];
-
-int PoliczCRC(char *wsk, int count)
-{
-    int sumaKontrolnaCRC = 0;
-    while (--count >= 0)
-    {
-        sumaKontrolnaCRC = sumaKontrolnaCRC ^ (int)*wsk++ << 8;
-
-        for (int i = 0; i < 8; ++i)
-            if (sumaKontrolnaCRC & 0x8000)
-                sumaKontrolnaCRC = sumaKontrolnaCRC << 1 ^ 0x1021;
-            else
-                sumaKontrolnaCRC = sumaKontrolnaCRC << 1;
-    }
-    return (sumaKontrolnaCRC & 0xFFFF);
-}
-
-int czyParzysty(int x, int y)
-{
-    if( y == 0 )
-        return 1;
-    if( y == 1 )
-        return x;
-
-    int wynik = x;
-    for( int i = 2; i <= y; i++ )
-        wynik = wynik * x;
-
-    return wynik;
-}
-
-
-char PoliczCRC_Znaku(int n, int nrZnaku)
-{
-    int x, binarna[16];
-
-    for(int z=0; z<16; z++)
-        binarna[z]=0;
-
-    for(int i=0; i<16; i++)
-    {
-        x=n%2;
-        if (x==1)
-            n=(n-1)/2;
-        if (x==0)
-            n=n/2;
-        binarna[15-i]=x;
-    }
-
-    x=0;
-    int k;
-
-    if(nrZnaku==1)
-        k=7;
-    if(nrZnaku==2)
-        k=15;
-
-    for (int i=0; i<8; i++)
-        x=x+czyParzysty(2,i)*binarna[k-i];
-
-    return (char)x;
-}
 
 int main()
 {
-    system("cls");
+    char znak_sterujacy;
+    unsigned long rozmiar_znaku = sizeof(znak_sterujacy);
+    int licznik_znakow = 1;
+
     cout << "ODBIORNIK\n";
-
-    cout << "Wybierz numer portu:" << endl
-         << "[2] - COM2\n[3] - COM3" << endl;
-
-    switch(getchar())
+    cout << "Wybierz numer portu:\n[2] - COM2\n[3] - COM3" << endl;
+    char port_id = getchar();
+    if(port_id == '2')
     {
-    case '2':
-    {
-        numerPortu = "COM2";
-        break;
+        numer_portu = "COM2";
     }
-    case '3':
+    else if(port_id == '3')
     {
-        numerPortu = "COM3";
-        break;
-    }
+        numer_portu = "COM3";
     }
 
-    cout << numerPortu << " - Uruchamianie transferu...\n";
-
-    if(ustawieniaPortu(numerPortu) == false )
+    cout << "Konfiguracja portu: " << numer_portu << " ..." << endl;
+    if(otwieraniePortu(numer_portu) == false)
+    {
         return 0;
+    }
     getchar();
 
-    cout << "Zgoda na transfer pliku" << endl
-         << "[1] - tak (ACK)" << endl
-         << "[2] - nie (NAK)" << endl;
-
-    switch(getchar())
+    cout << "Zgoda na transfer pliku\n[1] - tak (ACK)\n[2] - nie (NAK)" << endl;
+    char decyzja = getchar();
+    if(decyzja == '1')
     {
-    case '1':
-    {
-        znak = 'C';
-        break;
+        znak_sterujacy = C;
     }
-    case '2':
+    else if(decyzja == '2')
     {
-        znak = NAK;
-        break;
+        znak_sterujacy = NAK;
     }
-    default:
+    else
     {
-        cout << "Ustawienie domyslne: ACK.\n";
-        znak = 'C';
-    }
+        znak_sterujacy = NAK;
     }
 
+    bool transmisja = false;
     for(int i=0; i<6; i++)
     {
-        WriteFile(uchwytPortu, &znak, licznikZnakow, &rozmiarZnaku, NULL);
-        cout<<"Oczekiwanie na komunikat SOH...\n";
-        ReadFile(uchwytPortu, &znak, licznikZnakow, &rozmiarZnaku, NULL);
-        cout << (int)znak << endl;
-        if(znak==SOH)
+        WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        if(znak_sterujacy == SOH)
         {
-            cout << "Ustanowienie polaczenia powiodlo sie!\n";
+            cout << "Polaczenie powiodlo sie" << endl;
             transmisja = true;
             break;
         }
     }
-
     if(!transmisja)
     {
-        cout << "Polaczenie nieudane.\n";
-        exit(1);
-    }
-    plik.open("odebrana.txt",ios::binary);
-    cout<<"Trwa odbieranie pliku, prosze czekac...\n";
-
-    ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-    nrBloku=(int)znak;
-
-    ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-    dopelnienieDo255=znak;
-
-    for(int i=0; i<128; i++)
-    {
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        blokDanych[i] = znak;
+        cout << "Polaczenie nie powiodlo sie." << endl;
+        return 1;
     }
 
-    ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-    sumaKontrolnaCRC[0]=znak;
-    ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-    sumaKontrolnaCRC[1]=znak;
-    poprawnyPakiet=true;
+    ofstream plik("odebrana.txt",ios::binary);
 
-
-    if ((char)(255-nrBloku)!=dopelnienieDo255)
+    int nr_bloku = 0;
+    char blok_danych[128];
+    char suma_kontrolna_CRC[2];
+    for(int i=0;;i++)
     {
-        cout << "Niepoprawny numer pakietu.\n";
-        WriteFile(uchwytPortu, &NAK,licznikZnakow,&rozmiarZnaku, NULL);
-        poprawnyPakiet = false;
-    }
-    else
-    {
-        tmpCRC=PoliczCRC(blokDanych,128);
-
-        if(PoliczCRC_Znaku(tmpCRC,1) != sumaKontrolnaCRC[0] || PoliczCRC_Znaku(tmpCRC,2) != sumaKontrolnaCRC[1])
+        if(i > 0)
         {
-            cout << "Nieprawidlowa suma kontrolna.\n";
-            WriteFile(uchwytPortu, &NAK,licznikZnakow,&rozmiarZnaku, NULL);
-            poprawnyPakiet=false;
+            ReadFile(uchwyt_portu, &znak_sterujacy,licznik_znakow,&rozmiar_znaku, NULL);
+            if(znak_sterujacy == EOT || znak_sterujacy == CAN)
+            {
+                break;
+            }
+            cout << endl << "Odbieranie pakietu... " << nr_bloku+1 << endl;
         }
-    }
 
-    if(poprawnyPakiet)
-    {
-        for(int i=0; i<128; i++)
-        {
-            if(blokDanych[i]!=26)
-                plik<<blokDanych[i];
-        }
-        cout << "Odbieranie pakietu..." << nrBloku;
-        cout << " pakiet odebrany poprawnie.\n";
-        WriteFile(uchwytPortu, &ACK,licznikZnakow,&rozmiarZnaku, NULL);
-    }
-
-    while(1)
-    {
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        if(znak==EOT || znak==CAN)
-            break;
-        cout << "Odbieranie pakietu...";
-        cout << nrBloku+1 ;
-
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        nrBloku=(int)znak;
-
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        dopelnienieDo255=znak;
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        nr_bloku = (int)znak_sterujacy;
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        char dopelnienie = znak_sterujacy;
 
         for(int i=0; i<128; i++)
         {
-            ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-            blokDanych[i] = znak;
+            ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+            blok_danych[i] = znak_sterujacy;
         }
 
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        suma_kontrolna_CRC[0] = znak_sterujacy;
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        suma_kontrolna_CRC[1] = znak_sterujacy;
+        bool poprawny_pakiet = true;
 
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        sumaKontrolnaCRC[0]=znak;
-        ReadFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-        sumaKontrolnaCRC[1]=znak;
-        poprawnyPakiet=true;
-
-        if((char)(255-nrBloku)!=dopelnienieDo255)
+        if((char)(255-nr_bloku) != dopelnienie)
         {
-            cout << "Niepoprawny numer pakietu.\n";
-            WriteFile(uchwytPortu, &NAK,licznikZnakow,&rozmiarZnaku, NULL);
-            poprawnyPakiet=false;
+            cout << "Niepoprawny numer pakietu." << endl;
+            WriteFile(uchwyt_portu, &NAK, licznik_znakow, &rozmiar_znaku, NULL);
+            poprawny_pakiet = false;
         }
         else
         {
-            tmpCRC=PoliczCRC(blokDanych,128);
+            tmpCRC = calcrc(blok_danych,128);
 
-            if(PoliczCRC_Znaku(tmpCRC,1)!=sumaKontrolnaCRC[0] || PoliczCRC_Znaku(tmpCRC,2)!=sumaKontrolnaCRC[1])
+            if(PoliczCRC_Znaku(tmpCRC, 1) != suma_kontrolna_CRC[0]
+               || PoliczCRC_Znaku(tmpCRC, 2) != suma_kontrolna_CRC[1])
             {
-                cout << "Nieprawidlowa suma kontrolna.\n";
-                WriteFile(uchwytPortu, &NAK,licznikZnakow,&rozmiarZnaku, NULL);
-                poprawnyPakiet=false;
+                cout << "Nieprawidlowa suma kontrolna." << endl;
+                WriteFile(uchwyt_portu, &NAK, licznik_znakow, &rozmiar_znaku, NULL);
+                poprawny_pakiet = false;
             }
         }
-        if(poprawnyPakiet)
+        if(poprawny_pakiet)
         {
             for(int i=0; i<128; i++)
             {
-                if(blokDanych[i]!=26)
-                    plik<<blokDanych[i];
+                if(blok_danych[i]!=26)
+                    plik<<blok_danych[i];
             }
 
-            cout << " pakiet odebrany poprawnie.\n";
-            WriteFile(uchwytPortu, &ACK,licznikZnakow,&rozmiarZnaku, NULL);
+            cout << "Pakiet zostal odebrany poprawnie." << endl;
+            WriteFile(uchwyt_portu, &ACK, licznik_znakow, &rozmiar_znaku, NULL);
         }
     }
-    WriteFile(uchwytPortu, &ACK,licznikZnakow,&rozmiarZnaku, NULL);
+    WriteFile(uchwyt_portu, &ACK, licznik_znakow, &rozmiar_znaku, NULL);
 
     plik.close();
-    CloseHandle(uchwytPortu);
 
-    if(znak == CAN)
-        cout << "Blad transmisji - polaczenie zostalo przerwane.\n";
+    CloseHandle(uchwyt_portu);
+
+    if(znak_sterujacy == CAN)
+    {
+        cout << "Polaczenie zostalo przerwane." << endl;
+    }
     else
-        cout << "Transfer pliku zakonczony pomyslnie :)\n";
+    {
+        cout << "Plik zostal przeslany pomyslnie" << endl;
+    }
 
     return 0;
 }

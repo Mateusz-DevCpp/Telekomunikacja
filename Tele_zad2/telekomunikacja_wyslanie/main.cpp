@@ -1,217 +1,174 @@
-#include "const.h"
+#include <fstream>
+#include <string.h>
+#include <windows.h>
+#include <iostream>
 
-int calcrc(char *ptr, int count)
+#include "../code.h"
+#include "../port.h"
+#include "../funkcje.h"
+
+using namespace std;
+
+int main()
 {
-    int  crc;
-    char i;
-    crc = 0;
-    while (--count >= 0)
-    {
-        crc = crc ^ (int) *ptr++ << 8;
-        i = 8;
-        do
-        {
-            if (crc & 0x8000)
-                crc = crc << 1 ^ 0x1021;
-            else
-                crc = crc << 1;
-        } while(--i);
-    }
-    return (crc);
-}
-
-int czyParzysty(int x, int y)
-{
-    if( y == 0 )
-        return 1;
-    if( y == 1 )
-        return x;
-
-    int wynik = x;
-    for( int i = 2; i <= y; i++ )
-        wynik = wynik * x;
-
-    return wynik;
-}
-
-char PoliczCRC_Znaku(int n, int nrZnaku)
-{
-    int x, bin[16];
-    for( int z = 0; z<16; z++ )
-        bin[z] = 0;
-
-    for( int i = 0; i<16; i++ )
-    {
-        x = n % 2;
-        if( x == 1 )
-            n = (n-1)/2;
-        if( x == 0 )
-            n = n/2;
-        bin[15-i] = x;
-    }
-
-    x = 0;
-    int k;
-
-    if( nrZnaku == 1 )
-        k = 7;
-    if( nrZnaku == 2 )
-        k = 15;
-
-    for (int i=0; i<8; i++)
-        x = x + czyParzysty(2,i) * bin[k-i];
-
-    return (char)x;
-}
-
-int main ()
-{
-    system("cls");
-    cout << "NADAJNIK\n";
-    ifstream plik;
-    char znak;
-    int licznikZnakow = 1;
-    unsigned long rozmiarZnaku = sizeof(znak);
-    int kod;
-
+    char znak_sterujacy;
+    int licznik_znakow = 1;
+    unsigned long rozmiar_znaku = sizeof(znak_sterujacy);
+    int rezultat_laczenia;
     bool transmisja = false;
-    bool czyPoprawnyPakiet;
-    int nrBloku = 1;
-    char blok[128];
 
-    cout << "Wybierz numer portu:" << endl
-         << "[2] - COM2\n[3] - COM3" << endl;
+    cout << "NADAJNIK" << endl;
+    cout << "Wybierz numer portu:\n[2] - COM2\n[3] - COM3" << endl;
+    char port_id = getchar();
+    if(port_id == '2')
+    {
+        numer_portu = "COM2";
+    }
+    else if(port_id == '3')
+    {
+        numer_portu = "COM3";
+    }
 
-    switch(getchar())
+    cout << "Konfiguracja portu: " << numer_portu << " ..." << endl;
+    if(otwieraniePortu(numer_portu) == false)
     {
-    case '2':
-    {
-        numerPortu = "COM2";
-        break;
+        cout << "Konfiguracja portu: " << numer_portu << " zakonczyla sie niepowodzeniem." << endl;
+        return 1;
     }
-    case '3':
-    {
-        numerPortu = "COM3";
-        break;
-    }
-    }
-    cout << numerPortu << " - Uruchamianie transferu...\n";
-    if(ustawieniaPortu(numerPortu) == false )
-        return 0;
+    cout << "Konfiguracja portu: " << numer_portu << " zakonczyla sie sukcesem." << endl;
+    cout << "Oczekiwanie na zgode do transmisji." << endl;
 
-    cout << "\nOczekiwanie na zgode do transmisji... ";
     for(int i=0; i<6; i++)
     {
-        ReadFile(uchwytPortu, &znak, licznikZnakow, &rozmiarZnaku, NULL);
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
 
-        if(znak=='C')
+        if(znak_sterujacy == C)
         {
-            cout << "OK.\n";
-            kod = 1;
+            cout << "Wyrazono zgode na transmisje." << endl;
+            rezultat_laczenia = 1;
             transmisja = true;
             break;
         }
-        else if( znak == NAK )
+        else if(znak_sterujacy == NAK)
         {
-            cout << "Brak zgody.\n";
-            kod = 2;
-            transmisja = true;
+            cout << "Brak zgody na transmisje." << endl;
+            rezultat_laczenia = 2;
+            transmisja = false;
             break;
         }
     }
-    if(!transmisja)
-        exit(1);
 
-    plik.open("wyslana.txt",ios::binary);
+    if(transmisja == false)
+    {
+        return 1;
+    }
+
+    char blok[128];
+    int nr_bloku = 1;
+    ifstream plik("wiadomosc_do_wyslania.txt", ios::binary);
     while(!plik.eof())
     {
-        for( int i = 0; i < 128; i++ )
+        for(int i = 0; i < 128; i++)
+        {
             blok[i] = (char)26;
+        }
 
         int w = 0;
-
-        while( w<128 && !plik.eof() )
+        while(w < 128 && plik.eof() == false )
         {
             blok[w] = plik.get();
             if(plik.eof())
+            {
                 blok[w] = (char)26;
+            }
             w++;
         }
-        czyPoprawnyPakiet = false;
 
-        while(!czyPoprawnyPakiet)
+        bool przeslane_poprawnie = false;
+        while(!przeslane_poprawnie)
         {
-            cout << "Wysylanie pakietu... ";
+            cout << endl << "Wysylanie pakietu... " << nr_bloku << endl;
 
-            cout << nrBloku;
-            WriteFile(uchwytPortu, &SOH,licznikZnakow,&rozmiarZnaku, NULL);
-            znak=(char)nrBloku;
-            WriteFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
-            znak=(char)255-nrBloku;
-            WriteFile(uchwytPortu, &znak,licznikZnakow,&rozmiarZnaku, NULL);
+            WriteFile(uchwyt_portu, &SOH, licznik_znakow, &rozmiar_znaku, NULL);
+            znak_sterujacy = (char)nr_bloku;
+            WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+            znak_sterujacy = (char)(255 - nr_bloku);
+            WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
 
-
-            for( int i=0; i<128; i++ )
-                WriteFile(uchwytPortu, &blok[i],licznikZnakow,&rozmiarZnaku, NULL);
-            if( kod == 2 )
+            for(int i=0; i<128; i++)
             {
-                char suma_kontrolna=(char)26;
-                for(int i=0; i<128; i++)
-                    suma_kontrolna+=blok[i]%256;
-                WriteFile(uchwytPortu, &suma_kontrolna,licznikZnakow,&rozmiarZnaku, NULL);
-                cout<<" Suma kontrolna = " << (int)suma_kontrolna << endl;
+                WriteFile(uchwyt_portu, &blok[i], licznik_znakow, &rozmiar_znaku, NULL);
             }
-            else if(kod==1)
+
+            if(rezultat_laczenia == 1)
             {
-                tmpCRC=calcrc(blok,128);
-                znak=PoliczCRC_Znaku(tmpCRC,1);
-                WriteFile(uchwytPortu,&znak,licznikZnakow,&rozmiarZnaku, NULL);
-                znak=PoliczCRC_Znaku(tmpCRC,2);
-                WriteFile(uchwytPortu,&znak,licznikZnakow,&rozmiarZnaku, NULL);
+                tmpCRC = calcrc(blok, 128);
+                znak_sterujacy = PoliczCRC_Znaku(tmpCRC, 1);
+                WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+                znak_sterujacy = PoliczCRC_Znaku(tmpCRC, 2);
+                WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+            }
+            else if(rezultat_laczenia == 2)
+            {
+                char suma_kontrolna = (char)26;
+                for(int i=0; i<128; i++)
+                {
+                    suma_kontrolna += blok[i]%256;
+                }
+                WriteFile(uchwyt_portu, &suma_kontrolna, licznik_znakow, &rozmiar_znaku, NULL);
+                cout<<" Suma kontrolna = " << (int)suma_kontrolna << endl;
             }
 
             while(1)
             {
-                znak=' ';
-                ReadFile(uchwytPortu,&znak,licznikZnakow,&rozmiarZnaku, NULL);
+                ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
 
-                if(znak == ACK)
+                if(znak_sterujacy == ACK)
                 {
-                    czyPoprawnyPakiet=true;
-                    cout<<" pakiet przeslany poprawnie.\n";
+                    przeslane_poprawnie = true;
+                    cout << "Pakiet przeslany poprawnie." << endl;
                     break;
                 }
 
-                if(znak == NAK)
+                if(znak_sterujacy == NAK)
                 {
-                    cout << "Wysylanie pakietu anulowane (NAK).\n";
+                    cout << "Pakiet nie zosta³ przeslany poprawnie." << endl;
                     break;
                 }
 
-                if(znak == CAN)
+                if(znak_sterujacy == CAN)
                 {
-                    cout << "Polaczenie przerwane!\n";
+                    cout << "Polaczenie zostalo przerwane." << endl;
                     return 1;
                 }
             }
         }
-        if( nrBloku == 255 )
-            nrBloku = 1;
+
+        if(nr_bloku == 255)
+        {
+            nr_bloku = 1;
+        }
         else
-            nrBloku++;
+        {
+            nr_bloku++;
+        }
     }
     plik.close();
 
     while(1)
     {
-        znak = EOT;
-        WriteFile(uchwytPortu,&znak,licznikZnakow,&rozmiarZnaku, NULL);
-        ReadFile(uchwytPortu,&znak,licznikZnakow,&rozmiarZnaku, NULL);
-        if(znak == ACK)
+        znak_sterujacy = EOT;
+        WriteFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        ReadFile(uchwyt_portu, &znak_sterujacy, licznik_znakow, &rozmiar_znaku, NULL);
+        if(znak_sterujacy == ACK)
+        {
             break;
+        }
     }
-    CloseHandle(uchwytPortu);
-    cout << "Transfer pliku zakonczony pomyslnie :)\n";
+
+    CloseHandle(uchwyt_portu);
+
+    cout << "Transfer pliku zakonczony pomyslnie" << endl;
 
     return 0;
 }
