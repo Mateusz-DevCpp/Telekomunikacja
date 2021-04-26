@@ -8,7 +8,7 @@ const unsigned int MAX_BUFFOR_SIZE = 4096;
 struct Node
 {
     char znak;
-    int czestotliwosc;
+    int wystapienia;
     Node *prawy, *lewy;
 };
 
@@ -16,23 +16,23 @@ struct porownaj
 {
     bool operator()(Node* l, Node* r)
     {
-        return (l->czestotliwosc > r->czestotliwosc);
+        return (l->wystapienia > r->wystapienia);
     }
 };
 
-Node* getNode(char znak, int czestotliwosc, Node* lewy, Node* prawy)
+Node* getNode(char znak, int wystapienia, Node* lewy, Node* prawy)
 {
     Node* node = new Node();
 
     node->znak = znak;
-    node->czestotliwosc = czestotliwosc;
+    node->wystapienia = wystapienia;
     node->lewy = lewy;
     node->prawy = prawy;
 
     return node;
 }
 
-map <char, string> kod;
+map <char, string> kody;
 priority_queue<Node*, vector <Node*>, porownaj> pq;
 
 void zapiszKody(struct Node* korzen, string str)
@@ -41,7 +41,7 @@ void zapiszKody(struct Node* korzen, string str)
         return;
 
     if(!korzen->lewy && !korzen->prawy)
-        kod[korzen->znak] = str;
+        kody[korzen->znak] = str;
 
     zapiszKody(korzen->lewy, str + "0");
     zapiszKody(korzen->prawy, str + "1");
@@ -49,13 +49,14 @@ void zapiszKody(struct Node* korzen, string str)
 
 void DrzewoHuffmana(string wiadomosc)
 {
-    unordered_map <char, int> czestotliwosci;
-    for (char ch : wiadomosc)
+    unordered_map <char, int> wystapienia;
+
+    for(char ch : wiadomosc)
     {
-        czestotliwosci[ch]++;
+        wystapienia[ch]++;
     }
 
-    for(auto it : czestotliwosci)
+    for(auto it : wystapienia)
     {
         pq.push(getNode(it.first, it.second, nullptr, nullptr));
     }
@@ -67,7 +68,7 @@ void DrzewoHuffmana(string wiadomosc)
         Node *prawy = pq.top();
         pq.pop();
 
-        int suma = lewy->czestotliwosc + prawy->czestotliwosc;
+        int suma = lewy->wystapienia + prawy->wystapienia;
         pq.push(getNode('\0', suma, lewy, prawy));
     }
 
@@ -82,14 +83,14 @@ string odkodowanie(string wiadomosc)
     vector <char> pom1;
     vector <char> znaki;
 
-    for(const auto &it : kod)
+    for(const auto &it : kody)
     {
         int n = it.second.length();
         char char_array[n + 1];
 
         strcpy(char_array, it.second.c_str());
 
-        for (int i = 0; i < n; i ++)
+        for(int i=0; i<n; i++)
         {
             pom1.push_back(char_array[i]);
         }
@@ -100,15 +101,15 @@ string odkodowanie(string wiadomosc)
     }
 
     bool flaga = false;
-    for(int i = 0; i < wiadomosc.size(); i ++)
+    for(int i=0; i<wiadomosc.size(); i++)
     {
-        for(int j = 0; j < pom.size(); j ++)
+        for(int j=0; j<pom.size(); j++)
         {
-            for(int k = 0; k < pom[j].size(); k ++)
+            for(int k=0; k<pom[j].size(); k++)
             {
                 if(wiadomosc[i] == pom[j][k])
                 {
-                    if(k == pom[j].size() - 1)
+                    if(k == pom[j].size()-1)
                     {
                         wiadomosc_odkodowana += znaki[j];
                         flaga = true;
@@ -165,7 +166,7 @@ int main()
         return 1;
     }
 
-    sockaddr_in service{};
+    sockaddr_in service;
     memset(&service, 0, sizeof(service));
     service.sin_family = AF_INET;
     service.sin_addr.s_addr = inet_addr(ip_adres.c_str());
@@ -197,14 +198,14 @@ int main()
 
         DrzewoHuffmana(wiadomosc);
 
-        for(auto &it : kod)
+        for(auto &it : kody)
         {
             slownik += it.first + znak_wartosc + it.second + kolejny_kod;
         }
 
         for(char c : wiadomosc)
         {
-            zakodowana_wiadomosc += kod[c];
+            zakodowana_wiadomosc += kody[c];
         }
 
         cout << "Odkodowana wiadomosc: " << wiadomosc << endl;
@@ -266,7 +267,7 @@ int main()
 
         string wiadomosc_zakodowana;
         bool czytamy_klucz = true;
-        for (int i = 0; i < wiadomosc.size() - 1; i ++)
+        for(int i=0; i<wiadomosc.size()-1; i++)
         {
             if(wiadomosc[i] != '&' && czytamy_klucz)
             {
@@ -295,17 +296,17 @@ int main()
 
         int j = 0;
         string pom;
-        for(int i=0; i < slownik.size() - 1; i ++)
+        for(int i=0; i<slownik.size()-1; i++)
         {
             if(slownik[i] == znak_wartosc[0] && i != j)
             {
-                j = i + 1;
+                j = i+1;
                 while(slownik[j] != kolejny_kod[0])
                 {
                     pom += slownik[j];
                     j++;
                 }
-                kod[slownik[i - 1]] = pom;
+                kody[slownik[i-1]] = pom;
                 pom.clear();
             }
         }
@@ -326,6 +327,6 @@ int main()
     }
 
 
-    system( "pause" );
+    system("pause");
     return 0;
 }
