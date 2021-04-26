@@ -3,7 +3,7 @@
 
 using namespace std;
 
-const unsigned int MAX_BUF_LENGTH = 4096;
+const unsigned int MAX_BUFFOR_SIZE = 4096;
 
 struct Node
 {
@@ -172,7 +172,7 @@ int main()
     service.sin_port = htons(port);
 
     string wiadomosc, zakodowana_wiadomosc, slownik;
-    string znak_wartosc = ":", kolejny_kod = ",";
+    string znak_wartosc = "~", kolejny_kod = "^";
     switch (wybor)
     {
     case 1:
@@ -220,7 +220,7 @@ int main()
             WSACleanup();
             return 1;
         }
-        zakodowana_wiadomosc = slownik + ".." + zakodowana_wiadomosc + "..";
+        zakodowana_wiadomosc = slownik + "&&" + zakodowana_wiadomosc + "&&";
 
         send(gniazdo, zakodowana_wiadomosc.c_str(), zakodowana_wiadomosc.size(),0 );
         cout << "Wiadomosc zostala wyslana." << endl;
@@ -247,44 +247,43 @@ int main()
         cout << "Ustanowiono polaczenie" << endl;
         gniazdo = acceptSocket;
 
-        const unsigned int MAX_BUF_LENGTH = 4096;
-        vector<char> buffer(MAX_BUF_LENGTH);
+        char buffer[MAX_BUFFOR_SIZE];
         string wiadomosc;
         int bytesReceived = 0;
         do
         {
-            bytesReceived = recv(gniazdo, &buffer[0], buffer.size(), 0);
-            if(bytesReceived == -1)
+            bytesReceived = recv(gniazdo, buffer, MAX_BUFFOR_SIZE,  0);
+            if(bytesReceived == SOCKET_ERROR)
             {
                 return 5;
             }
             else
             {
-                wiadomosc.append(buffer.cbegin(), buffer.cend());
+                wiadomosc = string(buffer);
             }
         }
-        while(bytesReceived == MAX_BUF_LENGTH);
+        while(bytesReceived == MAX_BUFFOR_SIZE);
 
         string wiadomosc_zakodowana;
-        bool flaga = true;
+        bool czytamy_klucz = true;
         for (int i = 0; i < wiadomosc.size() - 1; i ++)
         {
-            if(wiadomosc[i] != '.' && flaga)
+            if(wiadomosc[i] != '&' && czytamy_klucz)
             {
                 slownik += wiadomosc[i];
             }
             else
             {
-                if(wiadomosc[i+1] == '.' && flaga)
+                if(wiadomosc[i+1] == '&' && czytamy_klucz)
                 {
-                    flaga = false;
+                    czytamy_klucz = false;
                     i ++;
                 }
                 else
                 {
-                    if(!flaga)
+                    if(!czytamy_klucz)
                     {
-                        if(wiadomosc[i] == '.')
+                        if(wiadomosc[i] == '&')
                             break;
 
                         wiadomosc_zakodowana += wiadomosc[i];
