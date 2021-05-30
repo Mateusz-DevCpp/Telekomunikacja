@@ -1,9 +1,10 @@
+#include <iostream>
 #include <bits/stdc++.h>
 #include <winsock2.h>
 
 using namespace std;
 
-const unsigned int MAX_BUFFOR_SIZE = 4096;
+#define MAX_BUFFOR_SIZE 1024
 
 struct Node
 {
@@ -35,7 +36,7 @@ Node* getNode(char znak, int wystapienia, Node* lewy, Node* prawy)
 map <char, string> kody;
 priority_queue<Node*, vector <Node*>, porownaj> pq;
 
-void zapiszKody(struct Node* korzen, string str)
+void generujKody(struct Node* korzen, string str)
 {
     if(korzen == nullptr)
         return;
@@ -43,8 +44,8 @@ void zapiszKody(struct Node* korzen, string str)
     if(!korzen->lewy && !korzen->prawy)
         kody[korzen->znak] = str;
 
-    zapiszKody(korzen->lewy, str + "0");
-    zapiszKody(korzen->prawy, str + "1");
+    generujKody(korzen->lewy, str + "0");
+    generujKody(korzen->prawy, str + "1");
 }
 
 void DrzewoHuffmana(string wiadomosc)
@@ -72,7 +73,7 @@ void DrzewoHuffmana(string wiadomosc)
         pq.push(getNode('\0', suma, lewy, prawy));
     }
 
-    zapiszKody(pq.top(), "");
+    generujKody(pq.top(), "");
 }
 
 string odkodowanie(string wiadomosc)
@@ -183,7 +184,6 @@ int main()
         cin >> plik_nazwa;
         if(plik_nazwa == "0")
             plik_nazwa = "plik.txt";
-
         ifstream plik_odczyt;
         plik_odczyt.open(plik_nazwa.c_str());
 
